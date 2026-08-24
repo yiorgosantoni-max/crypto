@@ -85,5 +85,11 @@
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1"
+  },
+  "allowScripts": {
+    "@clerk/shared@3.47.8": true,
+    "@swc/core@1.16.1": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.21.5": true
   }
 }
