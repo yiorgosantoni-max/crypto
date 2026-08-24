@@ -1,4 +1,3 @@
-
 export interface AddAssetRequest {
   symbol: string;
   quantity: number;
@@ -39,121 +38,44 @@ export interface PortfolioSummary {
   holdings: AggregatedHolding[];
 }
 
+interface CoinMarket {
+  id: string;
+  symbol: string;
+  name: string;
+  current_price: number;
+}
+
 class PortfolioApiService {
   private coinCache: { [key: string]: { price: number; name: string; coin_id: string; timestamp: number } } = {};
-  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  private readonly CACHE_DURATION = 5 * 60 * 1000;
 
   private async fetchCoinPrice(symbol: string): Promise<{ price: number; name: string; coin_id: string }> {
-    const cacheKey = symbol.toLowerCase();
-    const cached = this.coinCache[cacheKey];
-    
-    // Return cached data if it's still valid
+    const normalizedSymbol = symbol.trim().toLowerCase();
+    if (!normalizedSymbol) {
+      throw new Error("Coin symbol is required");
+    }
+
+    const cached = this.coinCache[normalizedSymbol];
     if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
-      return {
-        price: cached.price,
-        name: cached.name,
-        coin_id: cached.coin_id
-      };
+      return { price: cached.price, name: cached.name, coin_id: cached.coin_id };
     }
 
-    try {
-      // Use markets endpoint for better performance and correct naming
-      const marketResponse = await fetch(
-        `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${symbol}&order=market_cap_desc&per_page=1&sparkline=false`
-      );
-      
-      if (marketResponse.ok) {
-        const marketData = await marketResponse.json();
-        if (marketData.length > 0) {
-          const coin = marketData[0];
-          const result = {
-            price: coin.current_price,
-            name: coin.name,
-            coin_id: coin.id
-          };
-          
-          // Cache the result
-          this.coinCache[cacheKey] = {
-            ...result,
-            timestamp: Date.now()
-          };
-          
-          return result;
-        }
-      }
-
-      // Fallback: Search by symbol in markets data
-      const marketsBySymbolResponse = await fetch(
-        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&sparkline=false'
-      );
-      
-      if (marketsBySymbolResponse.ok) {
-        const allMarkets = await marketsBySymbolResponse.json();
-        const coin = allMarkets.find((c: any) => 
-          c.symbol.toLowerCase() === symbol.toLowerCase()
-        );
-        
-        if (coin) {
-          const result = {
-            price: coin.current_price,
-            name: coin.name,
-            coin_id: coin.id
-          };
-          
-          // Cache the result
-          this.coinCache[cacheKey] = {
-            ...result,
-            timestamp: Date.now()
-          };
-          
-          return result;
-        }
-      }
-
-      // Final fallback to coin list
-      const coinListResponse = await fetch('https://api.coingecko.com/api/v3/coins/list');
-      const coinList = await coinListResponse.json();
-      
-      const coin = coinList.find((c: any) => 
-        c.symbol.toLowerCase() === symbol.toLowerCase()
-      );
-      
-      if (!coin) {
-        throw new Error(`Coin ${symbol} not found`);
-      }
-
-      const priceResponse = await fetch(
-        `https://api.coingecko.com/api/v3/simple/price?ids=${coin.id}&vs_currencies=usd`
-      );
-      
-      if (!priceResponse.ok) {
-        throw new Error('Failed to fetch price data');
-      }
-      
-      const priceData = await priceResponse.json();
-      const price = priceData[coin.id]?.usd;
-      
-      if (!price) {
-        throw new Error(`Price not available for ${symbol}`);
-      }
-
-      const result = {
-        price,
-        name: coin.name,
-        coin_id: coin.id
-      };
-      
-      // Cache the result
-      this.coinCache[cacheKey] = {
-        ...result,
-        timestamp: Date.now()
-      };
-
-      return result;
-    } catch (error) {
-      console.error('Error fetching coin price:', error);
-      throw new Error(`Unable to fetch price for ${symbol}`);
+    const response = await fetch(
+      "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&sparkline=false"
+    );
+    if (!response.ok) {
+      throw new Error(`CoinGecko request failed with status ${response.status}`);
     }
+
+    const markets = (await response.json()) as CoinMarket[];
+    const coin = markets.find((market) => market.symbol.toLowerCase() === normalizedSymbol);
+    if (!coin || typeof coin.current_price !== "number" || coin.current_price <= 0) {
+      throw new Error(`Coin ${symbol} not found or has no valid USD price`);
+    }
+
+    const result = { price: coin.current_price, name: coin.name, coin_id: coin.id };
+    this.coinCache[normalizedSymbol] = { ...result, timestamp: Date.now() };
+    return result;
   }
 
   async addAsset(
@@ -162,6 +84,9 @@ class PortfolioApiService {
     getValidToken: () => Promise<string | null>
   ): Promise<PortfolioEntry> {
     const { symbol, quantity, use_real_time_price = true, custom_price } = request;
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error("Quantity must be a positive number");
+    }
 
     let price_used: number;
     let name: string;
@@ -173,53 +98,45 @@ class PortfolioApiService {
       name = coinData.name;
       coin_id = coinData.coin_id;
     } else {
-      if (!custom_price) {
-        throw new Error('Custom price is required when use_real_time_price is false');
+      if (!Number.isFinite(custom_price) || custom_price <= 0) {
+        throw new Error("Custom price must be a positive number when real-time pricing is disabled");
       }
       price_used = custom_price;
-      
-      // Try to get coin name and ID even for custom price
+
       try {
         const coinData = await this.fetchCoinPrice(symbol);
         name = coinData.name;
         coin_id = coinData.coin_id;
       } catch {
-        name = symbol.toUpperCase();
-        coin_id = symbol.toLowerCase();
+        name = symbol.trim().toUpperCase();
+        coin_id = symbol.trim().toLowerCase();
       }
     }
 
     const total_cost = quantity * price_used;
     const timestamp = new Date().toISOString();
+    const { portfolioService } = await import("./portfolioService");
 
-    // Use existing portfolio service to save to Supabase
-    const { portfolioService } = await import('./portfolioService');
-    
     const holdingData = {
-      symbol: symbol.toUpperCase(),
+      symbol: symbol.trim().toUpperCase(),
       name,
       amount: quantity,
       avgPrice: price_used,
-      purchaseDate: timestamp.split('T')[0],
+      purchaseDate: timestamp.split("T")[0],
       coinId: coin_id,
-      notes: `Added via API - Total cost: $${total_cost.toFixed(2)}`
+      notes: `Added via API - Total cost: $${total_cost.toFixed(2)}`,
     };
 
-    const savedHolding = await portfolioService.createHolding(
-      userId,
-      getValidToken,
-      holdingData
-    );
-
+    const savedHolding = await portfolioService.createHolding(userId, getValidToken, holdingData);
     return {
       id: savedHolding.id,
-      symbol: symbol.toUpperCase(),
+      symbol: symbol.trim().toUpperCase(),
       quantity,
       price_used,
       total_cost,
       timestamp,
       name,
-      coin_id
+      coin_id,
     };
   }
 
@@ -227,48 +144,36 @@ class PortfolioApiService {
     userId: string,
     getValidToken: () => Promise<string | null>
   ): Promise<PortfolioSummary> {
-    // Fetch holdings from Supabase
-    const { portfolioService } = await import('./portfolioService');
+    const { portfolioService } = await import("./portfolioService");
     const holdings = await portfolioService.fetchHoldings(userId, getValidToken);
 
     if (holdings.length === 0) {
-      return {
-        total_portfolio_value: 0,
-        total_invested: 0,
-        total_profit_or_loss: 0,
-        total_profit_or_loss_percentage: 0,
-        holdings: []
-      };
+      return { total_portfolio_value: 0, total_invested: 0, total_profit_or_loss: 0, total_profit_or_loss_percentage: 0, holdings: [] };
     }
 
-    // Group holdings by symbol and calculate aggregates
     const groupedHoldings: { [symbol: string]: AggregatedHolding } = {};
-
-    // Get current prices for all unique coin IDs in batch for better performance
-    const uniqueCoinIds = [...new Set(holdings.map(h => h.coinId))];
+    const uniqueCoinIds = [...new Set(holdings.map((h) => h.coinId))];
     const currentPrices: { [coinId: string]: number } = {};
 
     try {
-      // Batch fetch current prices
       const priceResponse = await fetch(
-        `https://api.coingecko.com/api/v3/simple/price?ids=${uniqueCoinIds.join(',')}&vs_currencies=usd`
+        `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(uniqueCoinIds.join(","))}&vs_currencies=usd`
       );
-      const priceData = await priceResponse.json();
-      
+      if (!priceResponse.ok) throw new Error(`Price request failed with status ${priceResponse.status}`);
+      const priceData = (await priceResponse.json()) as Record<string, { usd?: number }>;
+
       for (const coinId of uniqueCoinIds) {
-        currentPrices[coinId] = priceData[coinId]?.usd || 0;
+        const price = priceData[coinId]?.usd;
+        if (typeof price === "number" && Number.isFinite(price) && price > 0) {
+          currentPrices[coinId] = price;
+        }
       }
     } catch (error) {
-      console.error('Error fetching current prices:', error);
-      // Fallback to average price if real-time prices fail
-      for (const coinId of uniqueCoinIds) {
-        currentPrices[coinId] = 0;
-      }
+      console.error("Error fetching current prices:", error);
     }
 
     for (const holding of holdings) {
       const symbol = holding.symbol;
-      
       if (!groupedHoldings[symbol]) {
         groupedHoldings[symbol] = {
           symbol,
@@ -277,11 +182,11 @@ class PortfolioApiService {
           total_quantity: 0,
           average_buy_price: 0,
           total_invested: 0,
-          current_price: currentPrices[holding.coinId] || holding.avgPrice,
+          current_price: currentPrices[holding.coinId] ?? holding.avgPrice,
           current_value: 0,
           profit_or_loss: 0,
           profit_or_loss_percentage: 0,
-          entries: []
+          entries: [],
         };
       }
 
@@ -293,7 +198,7 @@ class PortfolioApiService {
         total_cost: holding.amount * holding.avgPrice,
         timestamp: holding.purchaseDate,
         name: holding.name,
-        coin_id: holding.coinId
+        coin_id: holding.coinId,
       };
 
       groupedHoldings[symbol].entries.push(entry);
@@ -301,41 +206,26 @@ class PortfolioApiService {
       groupedHoldings[symbol].total_invested += holding.amount * holding.avgPrice;
     }
 
-    // Calculate weighted averages and profit/loss
-    for (const symbol in groupedHoldings) {
-      const group = groupedHoldings[symbol];
-      group.average_buy_price = group.total_invested / group.total_quantity;
+    for (const group of Object.values(groupedHoldings)) {
+      group.average_buy_price = group.total_quantity > 0 ? group.total_invested / group.total_quantity : 0;
       group.current_value = group.total_quantity * group.current_price;
       group.profit_or_loss = group.current_value - group.total_invested;
-      group.profit_or_loss_percentage = group.total_invested > 0 
-        ? (group.profit_or_loss / group.total_invested) * 100 
+      group.profit_or_loss_percentage = group.total_invested > 0
+        ? (group.profit_or_loss / group.total_invested) * 100
         : 0;
     }
 
     const aggregatedHoldings = Object.values(groupedHoldings);
-    
     const total_portfolio_value = aggregatedHoldings.reduce((sum, h) => sum + h.current_value, 0);
     const total_invested = aggregatedHoldings.reduce((sum, h) => sum + h.total_invested, 0);
     const total_profit_or_loss = total_portfolio_value - total_invested;
-    const total_profit_or_loss_percentage = total_invested > 0 
-      ? (total_profit_or_loss / total_invested) * 100 
-      : 0;
+    const total_profit_or_loss_percentage = total_invested > 0 ? (total_profit_or_loss / total_invested) * 100 : 0;
 
-    return {
-      total_portfolio_value,
-      total_invested,
-      total_profit_or_loss,
-      total_profit_or_loss_percentage,
-      holdings: aggregatedHoldings
-    };
+    return { total_portfolio_value, total_invested, total_profit_or_loss, total_profit_or_loss_percentage, holdings: aggregatedHoldings };
   }
 
-  async deleteAsset(
-    assetId: string,
-    userId: string,
-    getValidToken: () => Promise<string | null>
-  ): Promise<void> {
-    const { portfolioService } = await import('./portfolioService');
+  async deleteAsset(assetId: string, userId: string, getValidToken: () => Promise<string | null>): Promise<void> {
+    const { portfolioService } = await import("./portfolioService");
     await portfolioService.deleteHolding(userId, getValidToken, assetId);
   }
 }
