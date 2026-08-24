@@ -1,0 +1,296 @@
+diff --git a/src/components/CryptoList.tsx b/src/components/CryptoList.tsx
+index 08b0b21..e6a42de 100644
+--- a/src/components/CryptoList.tsx
++++ b/src/components/CryptoList.tsx
+@@ -3,7 +3,18 @@ import { useQuery } from "@tanstack/react-query";
+ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+ import { TrendingUp, TrendingDown } from "lucide-react";
+ 
+-const fetchTopCoins = async () => {
++interface Coin {
++  id: string;
++  market_cap_rank: number;
++  image: string;
++  name: string;
++  symbol: string;
++  current_price: number;
++  price_change_percentage_24h: number;
++  market_cap: number;
++}
++
++const fetchTopCoins = async (): Promise<Coin[]> => {
+   const baseUrl = import.meta.env.VITE_API_BASE_URL;
+   const endpoint = baseUrl
+     ? `${baseUrl}/api/market/coins`
+@@ -64,7 +75,7 @@ const CryptoList = () => {
+                 </tr>
+               </thead>
+               <tbody>
+-                {coins?.map((coin: any) => (
++                {coins?.map((coin: Coin) => (
+                   <tr key={coin.id} className="border-b border-gray-800/50 hover:bg-gray-800/20 transition-colors">
+                     <td className="py-4 text-gray-400">{coin.market_cap_rank}</td>
+                     <td className="py-4">
+diff --git a/src/components/TradingViewChart.tsx b/src/components/TradingViewChart.tsx
+index e579e9d..c5a0c06 100644
+--- a/src/components/TradingViewChart.tsx
++++ b/src/components/TradingViewChart.tsx
+@@ -3,9 +3,24 @@ import { useEffect, useRef } from 'react';
+ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+ import { TrendingUp } from "lucide-react";
+ 
++interface TradingViewWidgetOptions {
++  container_id: string;
++  width: string | number;
++  height: string | number;
++  symbol: string;
++  interval: string;
++  timezone: string;
++  theme: string;
++  style: string;
++  locale: string;
++  [key: string]: unknown;
++}
++
+ declare global {
+   interface Window {
+-    TradingView: any;
++    TradingView: {
++      widget: new (options: TradingViewWidgetOptions) => unknown;
++    };
+   }
+ }
+ 
+diff --git a/src/components/ui/command.tsx b/src/components/ui/command.tsx
+index b8ff069..40d4de4 100644
+--- a/src/components/ui/command.tsx
++++ b/src/components/ui/command.tsx
+@@ -22,7 +22,7 @@ const Command = React.forwardRef<
+ ))
+ Command.displayName = CommandPrimitive.displayName
+ 
+-interface CommandDialogProps extends DialogProps {}
++type CommandDialogProps = DialogProps
+ 
+ const CommandDialog = ({ children, ...props }: CommandDialogProps) => {
+   return (
+diff --git a/src/components/ui/textarea.tsx b/src/components/ui/textarea.tsx
+index 9f9a6dc..12c9136 100644
+--- a/src/components/ui/textarea.tsx
++++ b/src/components/ui/textarea.tsx
+@@ -2,8 +2,7 @@ import * as React from "react"
+ 
+ import { cn } from "@/lib/utils"
+ 
+-export interface TextareaProps
+-  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
++export type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement>
+ 
+ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
+   ({ className, ...props }, ref) => {
+diff --git a/src/contexts/AuthContext.tsx b/src/contexts/AuthContext.tsx
+index d787eb2..ac37e1d 100644
+--- a/src/contexts/AuthContext.tsx
++++ b/src/contexts/AuthContext.tsx
+@@ -3,8 +3,17 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
+ import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
+ import { supabase } from '@/integrations/supabase/client';
+ 
++interface AppUser {
++  id: string;
++  email: string | undefined;
++  user_metadata: {
++    full_name: string | null | undefined;
++    avatar_url: string | undefined;
++  };
++}
++
+ interface AuthContextType {
+-  user: any | null;
++  user: AppUser | null;
+   loading: boolean;
+   signOut: () => Promise<void>;
+   supabaseToken: string | null;
+@@ -24,7 +33,7 @@ export const useAuth = () => {
+ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+   const { user: clerkUser, isLoaded } = useUser();
+   const { signOut: clerkSignOut, getToken } = useClerkAuth();
+-  const [user, setUser] = useState<any | null>(null);
++  const [user, setUser] = useState<AppUser | null>(null);
+   const [loading, setLoading] = useState(true);
+   const [supabaseToken, setSupabaseToken] = useState<string | null>(null);
+ 
+diff --git a/src/pages/Market.tsx b/src/pages/Market.tsx
+index 7fcd208..c9152eb 100644
+--- a/src/pages/Market.tsx
++++ b/src/pages/Market.tsx
+@@ -4,6 +4,31 @@ import { ArrowUpIcon, ArrowDownIcon, TrendingUp, DollarSign, BarChart3 } from "l
+ import Header from "@/components/Header";
+ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+ 
++interface Coin {
++  id: string;
++  market_cap_rank: number;
++  image: string;
++  name: string;
++  symbol: string;
++  current_price: number;
++  price_change_percentage_1h_in_currency?: number;
++  price_change_percentage_24h: number;
++  price_change_percentage_7d_in_currency?: number;
++  market_cap: number;
++  total_volume: number;
++}
++
++interface TrendingCoinItem {
++  id: string;
++  thumb: string;
++  name: string;
++  symbol: string;
++}
++
++interface TrendingCoin {
++  item: TrendingCoinItem;
++}
++
+ const fetchGlobalData = async () => {
+   const response = await fetch('https://api.coingecko.com/api/v3/global');
+   if (!response.ok) throw new Error('Failed to fetch global data');
+@@ -150,7 +175,7 @@ const Market = () => {
+               </CardHeader>
+               <CardContent>
+                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+-                  {trending?.coins?.slice(0, 7).map((coin: any, index: number) => (
++                  {trending?.coins?.slice(0, 7).map((coin: TrendingCoin, index: number) => (
+                     <div key={coin.item.id} className="flex items-center space-x-2 p-3 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 transition-colors">
+                       <span className="text-gray-400 text-sm">#{index + 1}</span>
+                       <img src={coin.item.thumb} alt={coin.item.name} className="w-6 h-6" />
+@@ -198,7 +223,7 @@ const Market = () => {
+                       </tr>
+                     </thead>
+                     <tbody>
+-                      {coins?.map((coin: any) => (
++                      {coins?.map((coin: Coin) => (
+                         <tr key={coin.id} className="border-b border-gray-800/50 hover:bg-gray-800/20 transition-colors">
+                           <td className="py-4 text-gray-400">{coin.market_cap_rank}</td>
+                           <td className="py-4">
+diff --git a/src/pages/Portfolio.tsx b/src/pages/Portfolio.tsx
+index a5efd0d..ac7ba6f 100644
+--- a/src/pages/Portfolio.tsx
++++ b/src/pages/Portfolio.tsx
+@@ -69,7 +69,7 @@ const CoinSearchDropdown = ({
+         console.log('Fetched coins count:', marketData.length);
+         
+         const formattedCoins: CoinDropdownItem[] = marketData
+-          .map((coin: any) => ({
++          .map((coin: { id: string; symbol: string; name: string; market_cap_rank: number | null }) => ({
+             id: coin.id,
+             symbol: coin.symbol.toUpperCase(),
+             name: coin.name,
+@@ -384,7 +384,7 @@ const Portfolio = () => {
+       });
+       setShowAddForm(false);
+     },
+-    onError: (error: any) => {
++    onError: (error: Error) => {
+       console.error('Add asset mutation error:', error);
+       toast({
+         title: "Error",
+@@ -409,7 +409,7 @@ const Portfolio = () => {
+         description: "Asset deleted successfully!",
+       });
+     },
+-    onError: (error: any) => {
++    onError: (error: Error) => {
+       toast({
+         title: "Error",
+         description: `Failed to delete asset: ${error.message}`,
+diff --git a/src/pages/Screener.tsx b/src/pages/Screener.tsx
+index 46fdb41..1b37b52 100644
+--- a/src/pages/Screener.tsx
++++ b/src/pages/Screener.tsx
+@@ -57,6 +57,13 @@ type WalletAsset = {
+   amount: number;
+ };
+ 
++interface CovalentToken {
++  balance: string;
++  contract_ticker_symbol?: string;
++  contract_name?: string;
++  contract_decimals?: number;
++}
++
+ const Screener = () => {
+   const [selectedVCId, setSelectedVCId] = useState<string>(MOCK_VCS[0].id);
+   const [walletAssets, setWalletAssets] = useState<WalletAsset[] | null>(null);
+@@ -84,8 +91,8 @@ const Screener = () => {
+         }
+         // Map to compatible array
+         const assets: WalletAsset[] = data.data.items
+-          .filter((token: any) => Number(token.balance) > 0 && (token.contract_ticker_symbol || token.contract_name))
+-          .map((token: any) => ({
++          .filter((token: CovalentToken) => Number(token.balance) > 0 && (token.contract_ticker_symbol || token.contract_name))
++          .map((token: CovalentToken) => ({
+             symbol: token.contract_ticker_symbol || "-",
+             name: token.contract_name || "-",
+             amount:
+diff --git a/src/services/portfolioApiService.ts b/src/services/portfolioApiService.ts
+index 89cc3be..ce820fb 100644
+--- a/src/services/portfolioApiService.ts
++++ b/src/services/portfolioApiService.ts
+@@ -89,7 +89,7 @@ class PortfolioApiService {
+       
+       if (marketsBySymbolResponse.ok) {
+         const allMarkets = await marketsBySymbolResponse.json();
+-        const coin = allMarkets.find((c: any) => 
++        const coin = allMarkets.find((c: { symbol: string; current_price: number; name: string; id: string }) => 
+           c.symbol.toLowerCase() === symbol.toLowerCase()
+         );
+         
+@@ -114,7 +114,7 @@ class PortfolioApiService {
+       const coinListResponse = await fetch('https://api.coingecko.com/api/v3/coins/list');
+       const coinList = await coinListResponse.json();
+       
+-      const coin = coinList.find((c: any) => 
++      const coin = coinList.find((c: { symbol: string; id: string; name: string }) => 
+         c.symbol.toLowerCase() === symbol.toLowerCase()
+       );
+       
+diff --git a/src/services/portfolioService.ts b/src/services/portfolioService.ts
+index 662992f..5c227c8 100644
+--- a/src/services/portfolioService.ts
++++ b/src/services/portfolioService.ts
+@@ -107,7 +107,15 @@ export class PortfolioService {
+     
+     const authedSupabase = await this.getAuthedClient(getValidToken);
+     
+-    const updatePayload: any = {};
++    const updatePayload: {
++      symbol?: string;
++      name?: string;
++      amount?: number;
++      avg_price?: number;
++      coin_id?: string;
++      purchase_date?: string;
++      notes?: string;
++    } = {};
+     if (updateData.symbol) updatePayload.symbol = updateData.symbol;
+     if (updateData.name) updatePayload.name = updateData.name;
+     if (updateData.amount !== undefined) updatePayload.amount = updateData.amount;
+diff --git a/tailwind.config.ts b/tailwind.config.ts
+index 8706086..8ff2536 100644
+--- a/tailwind.config.ts
++++ b/tailwind.config.ts
+@@ -1,4 +1,5 @@
+ import type { Config } from "tailwindcss";
++import tailwindcssAnimate from "tailwindcss-animate";
+ 
+ export default {
+ 	darkMode: ["class"],
+@@ -92,5 +93,5 @@ export default {
+ 			}
+ 		}
+ 	},
+-	plugins: [require("tailwindcss-animate")],
++	plugins: [tailwindcssAnimate],
+ } satisfies Config;

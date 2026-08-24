@@ -57,6 +57,13 @@ type WalletAsset = {
   amount: number;
 };
 
+interface CovalentToken {
+  balance: string;
+  contract_ticker_symbol?: string;
+  contract_name?: string;
+  contract_decimals?: number;
+}
+
 const Screener = () => {
   const [selectedVCId, setSelectedVCId] = useState<string>(MOCK_VCS[0].id);
   const [walletAssets, setWalletAssets] = useState<WalletAsset[] | null>(null);
@@ -84,8 +91,8 @@ const Screener = () => {
         }
         // Map to compatible array
         const assets: WalletAsset[] = data.data.items
-          .filter((token: any) => Number(token.balance) > 0 && (token.contract_ticker_symbol || token.contract_name))
-          .map((token: any) => ({
+          .filter((token: CovalentToken) => Number(token.balance) > 0 && (token.contract_ticker_symbol || token.contract_name))
+          .map((token: CovalentToken) => ({
             symbol: token.contract_ticker_symbol || "-",
             name: token.contract_name || "-",
             amount:

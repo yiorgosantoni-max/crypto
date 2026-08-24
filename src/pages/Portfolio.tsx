@@ -69,7 +69,7 @@ const CoinSearchDropdown = ({
         console.log('Fetched coins count:', marketData.length);
         
         const formattedCoins: CoinDropdownItem[] = marketData
-          .map((coin: any) => ({
+          .map((coin: { id: string; symbol: string; name: string; market_cap_rank: number | null }) => ({
             id: coin.id,
             symbol: coin.symbol.toUpperCase(),
             name: coin.name,
@@ -384,7 +384,7 @@ const Portfolio = () => {
       });
       setShowAddForm(false);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       console.error('Add asset mutation error:', error);
       toast({
         title: "Error",
@@ -409,7 +409,7 @@ const Portfolio = () => {
         description: "Asset deleted successfully!",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: `Failed to delete asset: ${error.message}`,

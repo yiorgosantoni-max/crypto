@@ -3,9 +3,24 @@ import { useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp } from "lucide-react";
 
+interface TradingViewWidgetOptions {
+  container_id: string;
+  width: string | number;
+  height: string | number;
+  symbol: string;
+  interval: string;
+  timezone: string;
+  theme: string;
+  style: string;
+  locale: string;
+  [key: string]: unknown;
+}
+
 declare global {
   interface Window {
-    TradingView: any;
+    TradingView: {
+      widget: new (options: TradingViewWidgetOptions) => unknown;
+    };
   }
 }
 

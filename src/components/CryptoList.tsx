@@ -3,7 +3,18 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
-const fetchTopCoins = async () => {
+interface Coin {
+  id: string;
+  market_cap_rank: number;
+  image: string;
+  name: string;
+  symbol: string;
+  current_price: number;
+  price_change_percentage_24h: number;
+  market_cap: number;
+}
+
+const fetchTopCoins = async (): Promise<Coin[]> => {
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const endpoint = baseUrl
     ? `${baseUrl}/api/market/coins`
@@ -64,7 +75,7 @@ const CryptoList = () => {
                 </tr>
               </thead>
               <tbody>
-                {coins?.map((coin: any) => (
+                {coins?.map((coin: Coin) => (
                   <tr key={coin.id} className="border-b border-gray-800/50 hover:bg-gray-800/20 transition-colors">
                     <td className="py-4 text-gray-400">{coin.market_cap_rank}</td>
                     <td className="py-4">

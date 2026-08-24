@@ -89,7 +89,7 @@ class PortfolioApiService {
       
       if (marketsBySymbolResponse.ok) {
         const allMarkets = await marketsBySymbolResponse.json();
-        const coin = allMarkets.find((c: any) => 
+        const coin = allMarkets.find((c: { symbol: string; current_price: number; name: string; id: string }) => 
           c.symbol.toLowerCase() === symbol.toLowerCase()
         );
         
@@ -114,7 +114,7 @@ class PortfolioApiService {
       const coinListResponse = await fetch('https://api.coingecko.com/api/v3/coins/list');
       const coinList = await coinListResponse.json();
       
-      const coin = coinList.find((c: any) => 
+      const coin = coinList.find((c: { symbol: string; id: string; name: string }) => 
         c.symbol.toLowerCase() === symbol.toLowerCase()
       );
       

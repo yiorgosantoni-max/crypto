@@ -3,8 +3,17 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { supabase } from '@/integrations/supabase/client';
 
+interface AppUser {
+  id: string;
+  email: string | undefined;
+  user_metadata: {
+    full_name: string | null | undefined;
+    avatar_url: string | undefined;
+  };
+}
+
 interface AuthContextType {
-  user: any | null;
+  user: AppUser | null;
   loading: boolean;
   signOut: () => Promise<void>;
   supabaseToken: string | null;
@@ -24,7 +33,7 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user: clerkUser, isLoaded } = useUser();
   const { signOut: clerkSignOut, getToken } = useClerkAuth();
-  const [user, setUser] = useState<any | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [supabaseToken, setSupabaseToken] = useState<string | null>(null);
 

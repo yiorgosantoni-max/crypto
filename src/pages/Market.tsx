@@ -4,6 +4,31 @@ import { ArrowUpIcon, ArrowDownIcon, TrendingUp, DollarSign, BarChart3 } from "l
 import Header from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+interface Coin {
+  id: string;
+  market_cap_rank: number;
+  image: string;
+  name: string;
+  symbol: string;
+  current_price: number;
+  price_change_percentage_1h_in_currency?: number;
+  price_change_percentage_24h: number;
+  price_change_percentage_7d_in_currency?: number;
+  market_cap: number;
+  total_volume: number;
+}
+
+interface TrendingCoinItem {
+  id: string;
+  thumb: string;
+  name: string;
+  symbol: string;
+}
+
+interface TrendingCoin {
+  item: TrendingCoinItem;
+}
+
 const fetchGlobalData = async () => {
   const response = await fetch('https://api.coingecko.com/api/v3/global');
   if (!response.ok) throw new Error('Failed to fetch global data');
@@ -150,7 +175,7 @@ const Market = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                  {trending?.coins?.slice(0, 7).map((coin: any, index: number) => (
+                  {trending?.coins?.slice(0, 7).map((coin: TrendingCoin, index: number) => (
                     <div key={coin.item.id} className="flex items-center space-x-2 p-3 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 transition-colors">
                       <span className="text-gray-400 text-sm">#{index + 1}</span>
                       <img src={coin.item.thumb} alt={coin.item.name} className="w-6 h-6" />
@@ -198,7 +223,7 @@ const Market = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {coins?.map((coin: any) => (
+                      {coins?.map((coin: Coin) => (
                         <tr key={coin.id} className="border-b border-gray-800/50 hover:bg-gray-800/20 transition-colors">
                           <td className="py-4 text-gray-400">{coin.market_cap_rank}</td>
                           <td className="py-4">

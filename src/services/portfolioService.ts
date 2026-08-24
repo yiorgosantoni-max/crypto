@@ -107,7 +107,15 @@ export class PortfolioService {
     
     const authedSupabase = await this.getAuthedClient(getValidToken);
     
-    const updatePayload: any = {};
+    const updatePayload: {
+      symbol?: string;
+      name?: string;
+      amount?: number;
+      avg_price?: number;
+      coin_id?: string;
+      purchase_date?: string;
+      notes?: string;
+    } = {};
     if (updateData.symbol) updatePayload.symbol = updateData.symbol;
     if (updateData.name) updatePayload.name = updateData.name;
     if (updateData.amount !== undefined) updatePayload.amount = updateData.amount;
